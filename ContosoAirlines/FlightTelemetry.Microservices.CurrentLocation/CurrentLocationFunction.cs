@@ -9,91 +9,79 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace FlightTelemetry.Microservices.CurrentLocation
+namespace FlightTelemetry.Microservices.CurrentLocation;
+
+public static class CurrentLocationFunction
 {
-    public static class CurrentLocationFunction
+    private static readonly CosmosClient _client =
+        new(Environment.GetEnvironmentVariable("CosmosDbConnectionString"));
+
+    private static readonly Dictionary<string, DateTime> _timestamps = new();
+
+    private static readonly object _threadLock = new();
+
+    [FunctionName("CurrentLocation")]
+    public static async Task CurrentLocation(
+        [CosmosDBTrigger(
+            Constants.DatabaseName,
+            Constants.LocationContainerName,
+            ConnectionStringSetting = "CosmosDbConnectionString",
+            LeaseCollectionName = "lease",
+            LeaseCollectionPrefix = "CurrentLocation-"
+        )]
+        IReadOnlyList<Document> documents,
+        ILogger logger)
     {
-        private static readonly CosmosClient _client =
-            new CosmosClient(Environment.GetEnvironmentVariable("CosmosDbConnectionString"));
+        var container = _client.GetContainer(Constants.DatabaseName, Constants.CurrentLocationContainerName);
 
-        private static readonly Dictionary<string, DateTime> _timestamps =
-            new Dictionary<string, DateTime>();
-
-        private static readonly object _threadLock =
-            new object();
-
-        [FunctionName("CurrentLocation")]
-		public static async Task CurrentLocation(
-			[CosmosDBTrigger(
-				databaseName: Constants.DatabaseName,
-				collectionName: Constants.LocationContainerName,
-				ConnectionStringSetting = "CosmosDbConnectionString",
-				LeaseCollectionName = "lease",
-				LeaseCollectionPrefix = "CurrentLocation-"
-			)]
-			IReadOnlyList<Document> documents,
-			ILogger logger)
-		{
-            var container = _client.GetContainer(Constants.DatabaseName, Constants.CurrentLocationContainerName);
-
-            foreach (var document in documents)
+        foreach (var document in documents)
+            try
             {
-                try
-                {
-                    await UpdateCurrentLocation(container, document, logger);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex.Message);
-                }
+                await UpdateCurrentLocation(container, document, logger);
             }
-        }
-
-        private static async Task UpdateCurrentLocation(Container container, Document document, ILogger logger)
-        {
-            var locationEvent = JsonConvert.DeserializeObject<LocationEvent>(document.ToString());
-
-            if (ShouldSkip(locationEvent))
+            catch (Exception ex)
             {
-                return;
+                logger.LogError(ex.Message);
             }
+    }
 
-            // Swap the GUID in the document's ID with the flight number to enable point reads
-            locationEvent.Id = locationEvent.FlightNumber;
+    private static async Task UpdateCurrentLocation(Container container, Document document, ILogger logger)
+    {
+        var locationEvent = JsonConvert.DeserializeObject<LocationEvent>(document.ToString());
 
-            // Upsert to the currentLocation container
-            var result = await container.UpsertItemAsync(locationEvent, new Microsoft.Azure.Cosmos.PartitionKey("location"));
+        if (ShouldSkip(locationEvent)) return;
 
-            logger.LogWarning($"Upserted location event to materialized view for flight {locationEvent.FlightNumber} ({result.RequestCharge} RUs)");
-        }
+        // Swap the GUID in the document's ID with the flight number to enable point reads
+        locationEvent.Id = locationEvent.FlightNumber;
 
-        private static bool ShouldSkip(LocationEvent locationEvent)
-        {
-            if (locationEvent.IsComplete)   // Make sure not to miss the last location event
-            {
-                return false;
-            }
-            // Throttle continuous processing by delaying between updates of the same flight to the currentLocation container
-            lock (_threadLock)
-            {
-                if (_timestamps.ContainsKey(locationEvent.FlightNumber))
-                {
-                    if (DateTime.Now.Subtract(_timestamps[locationEvent.FlightNumber]).TotalSeconds < 3)
-                    {
-                        return true;
-                    }
-                    else
-                    {
-                        _timestamps[locationEvent.FlightNumber] = DateTime.Now;
-                    }
-                }
-                else
-                {
-                    _timestamps.Add(locationEvent.FlightNumber, DateTime.Now);
-                }
-            }
+        // Upsert to the currentLocation container
+        var result =
+            await container.UpsertItemAsync(locationEvent, new Microsoft.Azure.Cosmos.PartitionKey("location"));
+
+        logger.LogWarning(
+            $"Upserted location event to materialized view for flight {locationEvent.FlightNumber} ({result.RequestCharge} RUs)");
+    }
+
+    private static bool ShouldSkip(LocationEvent locationEvent)
+    {
+        if (locationEvent.IsComplete) // Make sure not to miss the last location event
             return false;
+        // Throttle continuous processing by delaying between updates of the same flight to the currentLocation container
+        lock (_threadLock)
+        {
+            if (_timestamps.ContainsKey(locationEvent.FlightNumber))
+            {
+                if (DateTime.Now.Subtract(_timestamps[locationEvent.FlightNumber]).TotalSeconds < 3)
+                    return true;
+                else
+                    _timestamps[locationEvent.FlightNumber] = DateTime.Now;
+            }
+            else
+            {
+                _timestamps.Add(locationEvent.FlightNumber, DateTime.Now);
+            }
         }
 
+        return false;
     }
 }

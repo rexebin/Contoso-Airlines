@@ -38,7 +38,7 @@ namespace FlightTelemetry.Desktop
 
         #region "Properties"
 
-        private Map BingMaps => this.mapUserControl1.Map;
+        private Map BingMaps => mapUserControl1.Map;
 
         #endregion
 
@@ -51,40 +51,43 @@ namespace FlightTelemetry.Desktop
             var config = ConfigurationManager.AppSettings;
             Cosmos.SetAuth(config["CosmosEndpoint"], config["CosmosMasterKey"]);
 
-            this._repo = new FlightRepo();
+            _repo = new FlightRepo();
 
-            this.BingMaps.CredentialsProvider = new ApplicationIdCredentialsProvider(ConfigurationManager.AppSettings["BingMapsKey"]);
+            BingMaps.CredentialsProvider =
+                new ApplicationIdCredentialsProvider(ConfigurationManager.AppSettings["BingMapsKey"]);
         }
 
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
 
-            this.LoadMetadata();
+            LoadMetadata();
         }
 
         private void LoadMetadata()
         {
-            this.EnableDisableUI(false);
+            EnableDisableUI(false);
             try
             {
                 Task.Run(async () =>
                 {
-                    this._airports = await this._repo.GetAirports();
-                    this._flights = await this._repo.GetFlights();
+                    _airports = await _repo.GetAirports();
+                    _flights = await _repo.GetFlights();
                 }).Wait();
 
-                this.LoadLocationMap();
-                this.LoadArrivalsBoard();
+                LoadLocationMap();
+                LoadArrivalsBoard();
             }
             catch (Exception ex)
             {
                 var message = ex.GetExceptionMessage();
-                this.LogOutput(message);
-                System.Windows.Forms.MessageBox.Show(message, "Error loading metadata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LogOutput(message);
+                System.Windows.Forms.MessageBox.Show(message, "Error loading metadata", MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 return;
             }
-            this.EnableDisableUI(true);
+
+            EnableDisableUI(true);
         }
 
         #endregion
@@ -93,84 +96,93 @@ namespace FlightTelemetry.Desktop
 
         private void LoadLocationMap()
         {
-            this.BingMaps.Mode = new AerialMode(true);
-            this.BingMaps.SetView(new Location(39.8283, -98.5795), zoomLevel: 4);
+            BingMaps.Mode = new AerialMode(true);
+            BingMaps.SetView(new Location(39.8283, -98.5795), 4);
 
-            this.LocationMapTreeView.Nodes.Clear();
-            var rootNode = this.LocationMapTreeView.Nodes.Add("All flights");
+            LocationMapTreeView.Nodes.Clear();
+            var rootNode = LocationMapTreeView.Nodes.Add("All flights");
 
-            foreach (var flight in this._flights)
+            foreach (var flight in _flights)
             {
                 var node = new TreeNode
                 {
                     Text = $"{flight.FlightNumber} {flight.DepartureAirport} > {flight.ArrivalAirport}",
-                    Tag = flight,
+                    Tag = flight
                 };
                 rootNode.Nodes.Add(node);
             }
 
-            this.LocationMapTreeView.ExpandAll();
+            LocationMapTreeView.ExpandAll();
         }
 
         private void LocationMapTreeView_AfterCheck(object sender, TreeViewEventArgs e)
         {
-            if (this._suppressEvent)
-            {
-                return;
-            }
+            if (_suppressEvent) return;
 
-            this.CheckUncheckChildNodes(e.Node);
-            this.RefreshLocationMap();
+            CheckUncheckChildNodes(e.Node);
+            RefreshLocationMap();
         }
 
-        private void AirportsCheckbox_CheckedChanged(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void AirportsCheckbox_CheckedChanged(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
-        private void FlightsCheckbox_CheckedChanged(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void FlightsCheckbox_CheckedChanged(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
-        private void FlightLabelCheckBox_CheckedChanged(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void FlightLabelCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
-        private void TrailingCheckBox_CheckedChanged(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void TrailingCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
-        private void LeadingCheckBox_CheckedChanged(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void LeadingCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
-        private void WashDcCheckBox_CheckedChanged(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void WashDcCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
         private void MaterializedViewCheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            this.ClearLog();
+            ClearLog();
         }
 
-        private void LocationMapTimer_Tick(object sender, EventArgs e) => this.RefreshLocationMap();
+        private void LocationMapTimer_Tick(object sender, EventArgs e)
+        {
+            RefreshLocationMap();
+        }
 
         private void RefreshLocationMap()
         {
             System.Windows.Forms.Application.DoEvents();
             var locations = default(Dictionary<string, LocationEvent>);
-            Task.Run(async () =>
-            {
-                locations = await this.GetFlightLocations();
-            }).Wait();
+            Task.Run(async () => { locations = await GetFlightLocations(); }).Wait();
 
-            this.RefreshWashingtonDc();
-            this.RefreshAirports();
-            this.RefreshFlightLocations(locations);
+            RefreshWashingtonDc();
+            RefreshAirports();
+            RefreshFlightLocations(locations);
         }
 
         private void RefreshWashingtonDc()
         {
-            if (this.WashDcCheckBox.Checked)
+            if (WashDcCheckBox.Checked)
             {
-                if (!this._washingtonDcVisible)
-                {
-                    this.ShowWashingtonDc();
-                }
+                if (!_washingtonDcVisible) ShowWashingtonDc();
             }
             else
             {
-                if (this._washingtonDcVisible)
-                {
-                    this.HideWashingtonDc();
-                }
+                if (_washingtonDcVisible) HideWashingtonDc();
             }
         }
 
@@ -181,7 +193,7 @@ namespace FlightTelemetry.Desktop
             const int AllowableRadius = 150;
 
             var center = new Location(DcLatitude, DcLongitude);
-            var circle = this.CreateCircle(center, AllowableRadius);
+            var circle = CreateCircle(center, AllowableRadius);
 
             var poly = new MapPolyline
             {
@@ -189,86 +201,75 @@ namespace FlightTelemetry.Desktop
                 Stroke = new SolidColorBrush(Colors.Red),
                 StrokeThickness = 2,
                 Tag = "dc",
-                ToolTip = "Washington DC No-Fly Zone",
+                ToolTip = "Washington DC No-Fly Zone"
             };
-            this.BingMaps.Children.Add(poly);
-            this._washingtonDcVisible = true;
+            BingMaps.Children.Add(poly);
+            _washingtonDcVisible = true;
         }
 
         public LocationCollection CreateCircle(Location center, double radiusMiles)
         {
-            var points = this._spatial.CreateCirclePoints(center.Latitude, center.Longitude, radiusMiles);
+            var points = _spatial.CreateCirclePoints(center.Latitude, center.Longitude, radiusMiles);
             var circle = new LocationCollection();
-            foreach (var point in points)
-            {
-                circle.Add(new Location(point.Item1, point.Item2));
-            }
+            foreach (var point in points) circle.Add(new Location(point.Item1, point.Item2));
 
             return circle;
         }
 
         private void HideWashingtonDc()
         {
-            this.HideMapObjects("dc");
-            this._washingtonDcVisible = false;
+            HideMapObjects("dc");
+            _washingtonDcVisible = false;
         }
 
         private void RefreshAirports()
         {
-            if (this.AirportsCheckBox.Checked)
+            if (AirportsCheckBox.Checked)
             {
-                if (!this._airportsVisible)
-                {
-                    this.ShowAirports();
-                }
+                if (!_airportsVisible) ShowAirports();
             }
             else
             {
-                if (this._airportsVisible)
-                {
-                    this.HideAirports();
-                }
+                if (_airportsVisible) HideAirports();
             }
         }
 
         private void ShowAirports()
         {
-            foreach (var airport in this._airports)
+            foreach (var airport in _airports)
             {
                 var pin = new Pushpin
                 {
                     Location = new Location(airport.Latitude, airport.Longitude),
                     Tag = "airport",
-                    ToolTip = $"{airport.Name}\r\n({airport.Code})",
+                    ToolTip = $"{airport.Name}\r\n({airport.Code})"
                 };
-                this.BingMaps.Children.Add(pin);
+                BingMaps.Children.Add(pin);
             }
-            this._airportsVisible = true;
+
+            _airportsVisible = true;
         }
 
         private void HideAirports()
         {
-            this.HideMapObjects("airport");
-            this._airportsVisible = false;
+            HideMapObjects("airport");
+            _airportsVisible = false;
         }
 
         private async Task<Dictionary<string, LocationEvent>> GetFlightLocations()
         {
-            if (this.MaterializedViewCheckBox.Checked)
-            {
-                return await GetFlightLocationsFromMaterializedView();
-            }
+            if (MaterializedViewCheckBox.Checked) return await GetFlightLocationsFromMaterializedView();
 
             var dict = new Dictionary<string, LocationEvent>();
 
-            foreach (TreeNode node in this.LocationMapTreeView.Nodes[0].Nodes)
+            foreach (TreeNode node in LocationMapTreeView.Nodes[0].Nodes)
             {
                 System.Windows.Forms.Application.DoEvents();
                 var flight = (Flight)node.Tag;
-                if (this.FlightsCheckbox.Checked && node.Checked)
+                if (FlightsCheckbox.Checked && node.Checked)
                 {
-                    var queryOperation = await this._repo.QueryLocation(flight.FlightNumber);
-                    this.LogOutput($"'{queryOperation.Sql}' - Cost: {queryOperation.Cost} RUs", queryOperation.Cost);
+                    var queryOperation = await _repo.QueryLocation(flight.FlightNumber);
+                    LogOutput($"'{queryOperation.Sql}' - Cost: {queryOperation.Cost} RUs", queryOperation.Cost);
                     dict.Add(flight.FlightNumber, queryOperation.LocationEvent);
                 }
                 else
@@ -276,6 +277,7 @@ namespace FlightTelemetry.Desktop
                     dict.Add(flight.FlightNumber, null);
                 }
             }
+
             return dict;
         }
 
@@ -283,15 +285,12 @@ namespace FlightTelemetry.Desktop
         {
             var dict = new Dictionary<string, LocationEvent>();
             var flights = new List<Flight>();
-            foreach (TreeNode node in this.LocationMapTreeView.Nodes[0].Nodes)
+            foreach (TreeNode node in LocationMapTreeView.Nodes[0].Nodes)
             {
                 System.Windows.Forms.Application.DoEvents();
                 var flight = (Flight)node.Tag;
                 dict.Add(flight.FlightNumber, null);
-                if (this.FlightsCheckbox.Checked && node.Checked)
-                {
-                    flights.Add(flight);
-                }
+                if (FlightsCheckbox.Checked && node.Checked) flights.Add(flight);
             }
 
             if (flights.Count <= 3)
@@ -299,20 +298,19 @@ namespace FlightTelemetry.Desktop
                 foreach (var flight in flights)
                 {
                     var flightNumber = flight.FlightNumber;
-                    var readOperation = await this._repo.ReadCurrentLocation(flightNumber);
-                    this.LogOutput($"'Point read for flight {flightNumber}' - Cost: {readOperation.Cost} RUs", readOperation.Cost);
+                    var readOperation = await _repo.ReadCurrentLocation(flightNumber);
+                    LogOutput($"'Point read for flight {flightNumber}' - Cost: {readOperation.Cost} RUs",
+                        readOperation.Cost);
                     dict[flightNumber] = readOperation.LocationEvent;
                 }
             }
             else if (flights.Count > 3)
             {
                 var flightNumbers = flights.Select(f => f.FlightNumber).ToArray();
-                var queryOperation = await this._repo.QueryCurrentLocations(flightNumbers);
+                var queryOperation = await _repo.QueryCurrentLocations(flightNumbers);
                 foreach (var locationEvent in queryOperation.LocationEvents)
-                {
                     dict[locationEvent.FlightNumber] = locationEvent;
-                }
-                this.LogOutput($"'{queryOperation.Sql}' - Cost: {queryOperation.Cost} RUs", queryOperation.Cost);
+                LogOutput($"'{queryOperation.Sql}' - Cost: {queryOperation.Cost} RUs", queryOperation.Cost);
             }
 
             return dict;
@@ -324,18 +322,15 @@ namespace FlightTelemetry.Desktop
             {
                 HideFlightLocation(flightNumber);
                 var location = locations[flightNumber];
-                if (location != null && location.RemainingMiles > 50)
-                {
-                    ShowFlightLocation(location);
-                }
+                if (location != null && location.RemainingMiles > 50) ShowFlightLocation(location);
             }
         }
 
         private void ShowFlightLocation(LocationEvent location)
         {
-            if (this.TrailingCheckBox.Checked)
+            if (TrailingCheckBox.Checked)
             {
-                var departureAirport = this._airports.First(a => a.Code == location.DepartureAirport);
+                var departureAirport = _airports.First(a => a.Code == location.DepartureAirport);
                 var line = new MapPolyline
                 {
                     Locations = new LocationCollection
@@ -345,14 +340,14 @@ namespace FlightTelemetry.Desktop
                     },
                     Stroke = new SolidColorBrush(Colors.Yellow),
                     StrokeThickness = 2,
-                    Tag = $"flight.{location.FlightNumber}",
+                    Tag = $"flight.{location.FlightNumber}"
                 };
-                this.BingMaps.Children.Add(line);
+                BingMaps.Children.Add(line);
             }
 
-            if (this.LeadingCheckBox.Checked)
+            if (LeadingCheckBox.Checked)
             {
-                var arrivalAirport = this._airports.First(a => a.Code == location.ArrivalAirport);
+                var arrivalAirport = _airports.First(a => a.Code == location.ArrivalAirport);
                 var line = new MapPolyline
                 {
                     Locations = new LocationCollection
@@ -363,20 +358,21 @@ namespace FlightTelemetry.Desktop
                     Stroke = new SolidColorBrush(Colors.Yellow),
                     StrokeThickness = 2,
                     StrokeDashArray = new DoubleCollection(new double[] { 1 }),
-                    Tag = $"flight.{location.FlightNumber}",
+                    Tag = $"flight.{location.FlightNumber}"
                 };
-                this.BingMaps.Children.Add(line);
+                BingMaps.Children.Add(line);
             }
 
-            var flight = this._flights.First(f => f.FlightNumber == location.FlightNumber);
+            var flight = _flights.First(f => f.FlightNumber == location.FlightNumber);
 
             var planeIcon = new System.Windows.Controls.Image
             {
                 Source = new BitmapImage(new Uri(@".\Images\airplane-2-48.png", UriKind.Relative)),
-                ToolTip = $"Flight: {location.FlightNumber} ({location.DepartureAirport} > {location.ArrivalAirport})\r\nSpeed: {location.Speed} mph\r\nAltitude: {location.Altitude} ft\r\nLocation: {location.Latitude}, {location.Longitude}",
+                ToolTip =
+                    $"Flight: {location.FlightNumber} ({location.DepartureAirport} > {location.ArrivalAirport})\r\nSpeed: {location.Speed} mph\r\nAltitude: {location.Altitude} ft\r\nLocation: {location.Latitude}, {location.Longitude}",
                 Width = 48,
                 Height = 48,
-                LayoutTransform = new RotateTransform { Angle = flight.IconRotation },
+                LayoutTransform = new RotateTransform { Angle = flight.IconRotation }
             };
             var planeLayer = new MapLayer
             {
@@ -384,33 +380,33 @@ namespace FlightTelemetry.Desktop
             };
             planeLayer.AddChild(planeIcon, new Location(location.Latitude, location.Longitude), PositionOrigin.Center);
 
-            if (this.FlightLabelCheckBox.Checked)
+            if (FlightLabelCheckBox.Checked)
             {
                 var planeLabel = new System.Windows.Controls.Label
                 {
                     Content = location.FlightNumber,
                     FontWeight = FontWeights.Bold,
                     Background = new SolidColorBrush(Colors.Black) { Opacity = .5 },
-                    Foreground = System.Windows.Media.Brushes.Yellow,
+                    Foreground = System.Windows.Media.Brushes.Yellow
                 };
-                planeLayer.AddChild(planeLabel, new Location(location.Latitude, location.Longitude), new System.Windows.Point(-16, 24));
+                planeLayer.AddChild(planeLabel, new Location(location.Latitude, location.Longitude),
+                    new System.Windows.Point(-16, 24));
             }
 
-            this.BingMaps.Children.Add(planeLayer);
+            BingMaps.Children.Add(planeLayer);
         }
 
-        private void HideFlightLocation(string flightNumber) =>
-            this.HideMapObjects($"flight.{flightNumber}");
+        private void HideFlightLocation(string flightNumber)
+        {
+            HideMapObjects($"flight.{flightNumber}");
+        }
 
         private void HideMapObjects(string tag)
         {
-            for (var i = this.BingMaps.Children.Count - 1; i >= 0; i--)
+            for (var i = BingMaps.Children.Count - 1; i >= 0; i--)
             {
-                var child = this.BingMaps.Children[i];
-                if (child is FrameworkElement item && item.Tag.ToString() == tag)
-                {
-                    this.BingMaps.Children.RemoveAt(i);
-                }
+                var child = BingMaps.Children[i];
+                if (child is FrameworkElement item && item.Tag.ToString() == tag) BingMaps.Children.RemoveAt(i);
             }
         }
 
@@ -420,52 +416,48 @@ namespace FlightTelemetry.Desktop
 
         private void LoadArrivalsBoard()
         {
-            this.ArrivalsBoardTreeView.Nodes.Clear();
-            var rootNode = this.ArrivalsBoardTreeView.Nodes.Add("All airports");
+            ArrivalsBoardTreeView.Nodes.Clear();
+            var rootNode = ArrivalsBoardTreeView.Nodes.Add("All airports");
 
-            foreach (var airport in this._airports)
+            foreach (var airport in _airports)
             {
                 var node = new TreeNode
                 {
                     Text = airport.Code,
-                    Tag = airport,
+                    Tag = airport
                 };
                 rootNode.Nodes.Add(node);
             }
 
-            this.ArrivalsBoardTreeView.ExpandAll();
+            ArrivalsBoardTreeView.ExpandAll();
 
-            this.ArrivalsBoardDataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Consolas", 16);
-            this.ArrivalsBoardDataGridView.ColumnHeadersDefaultCellStyle.BackColor = System.Drawing.Color.White;
-            this.ArrivalsBoardDataGridView.ColumnHeadersDefaultCellStyle.ForeColor = System.Drawing.Color.Blue;
+            ArrivalsBoardDataGridView.ColumnHeadersDefaultCellStyle.Font = new Font("Consolas", 16);
+            ArrivalsBoardDataGridView.ColumnHeadersDefaultCellStyle.BackColor = System.Drawing.Color.White;
+            ArrivalsBoardDataGridView.ColumnHeadersDefaultCellStyle.ForeColor = System.Drawing.Color.Blue;
 
-            this.ArrivalsBoardDataGridView.DefaultCellStyle.Font = new Font("Consolas", 16);
-            this.ArrivalsBoardDataGridView.DefaultCellStyle.BackColor = System.Drawing.Color.Blue;
-            this.ArrivalsBoardDataGridView.DefaultCellStyle.ForeColor = System.Drawing.Color.White;
+            ArrivalsBoardDataGridView.DefaultCellStyle.Font = new Font("Consolas", 16);
+            ArrivalsBoardDataGridView.DefaultCellStyle.BackColor = System.Drawing.Color.Blue;
+            ArrivalsBoardDataGridView.DefaultCellStyle.ForeColor = System.Drawing.Color.White;
         }
 
         private void ArrivalsBoardTreeView_AfterCheck(object sender, TreeViewEventArgs e)
         {
-            if (this._suppressEvent)
-            {
-                return;
-            }
+            if (_suppressEvent) return;
 
-            this.CheckUncheckChildNodes(e.Node);
-            this.RefreshArrivalsBoard();
+            CheckUncheckChildNodes(e.Node);
+            RefreshArrivalsBoard();
         }
 
-        private void ArrivalsBoardTimer_Tick(object sender, EventArgs e) =>
-            this.RefreshArrivalsBoard();
+        private void ArrivalsBoardTimer_Tick(object sender, EventArgs e)
+        {
+            RefreshArrivalsBoard();
+        }
 
         private void RefreshArrivalsBoard()
         {
             System.Windows.Forms.Application.DoEvents();
             var arrivals = default(Dictionary<string, AirportArrivals>);
-            Task.Run(async () =>
-            {
-                arrivals = await this.GetArrivalsBoard();
-            }).Wait();
+            Task.Run(async () => { arrivals = await GetArrivalsBoard(); }).Wait();
 
             var dt = new DataTable();
             dt.Columns.AddRange(new[]
@@ -473,53 +465,53 @@ namespace FlightTelemetry.Desktop
                 new DataColumn("Flight"),
                 new DataColumn("From"),
                 new DataColumn("To"),
-                new DataColumn("Status"),
+                new DataColumn("Status")
             });
             foreach (var airportCode in arrivals.Keys)
             {
                 var airportArrivals = arrivals[airportCode];
                 if (airportArrivals != null)
-                {
                     foreach (var flight in airportArrivals.Flights)
                     {
                         var arrivingAt = DateTime.Now.AddMinutes(flight.RemainingMinutes);
                         var status = flight.RemainingMinutes == 0 ? "ARRIVED" : arrivingAt.ToString("hh:mm tt");
                         dt.Rows.Add(new object[] { flight.FlightNumber, flight.DepartureAirport, airportCode, status });
                     }
-                }
             }
-            this.ArrivalsBoardDataGridView.DataSource = dt;
-            this.ArrivalsBoardDataGridView.DefaultCellStyle.SelectionBackColor = this.ArrivalsBoardDataGridView.DefaultCellStyle.BackColor;
-            this.ArrivalsBoardDataGridView.DefaultCellStyle.SelectionForeColor = this.ArrivalsBoardDataGridView.DefaultCellStyle.ForeColor;
-            this.ArrivalsBoardDataGridView.Refresh();
+
+            ArrivalsBoardDataGridView.DataSource = dt;
+            ArrivalsBoardDataGridView.DefaultCellStyle.SelectionBackColor =
+                ArrivalsBoardDataGridView.DefaultCellStyle.BackColor;
+            ArrivalsBoardDataGridView.DefaultCellStyle.SelectionForeColor =
+                ArrivalsBoardDataGridView.DefaultCellStyle.ForeColor;
+            ArrivalsBoardDataGridView.Refresh();
             System.Windows.Forms.Application.DoEvents();
         }
 
         private async Task<Dictionary<string, AirportArrivals>> GetArrivalsBoard()
         {
             var dict = new Dictionary<string, AirportArrivals>();
-            foreach (TreeNode node in this.ArrivalsBoardTreeView.Nodes[0].Nodes)
+            foreach (TreeNode node in ArrivalsBoardTreeView.Nodes[0].Nodes)
             {
                 System.Windows.Forms.Application.DoEvents();
                 var airport = (Airport)node.Tag;
                 if (node.Checked)
-                {
                     // With the materialized view, this can be done with a point read on the currentLocation container
                     try
                     {
-                        var readOperation = await this._repo.ReadAirportArrivals(airport.Code);
-                        this.LogOutput($"'Arrivals board point read by pk/id {airport.Code}' - Cost: {readOperation.Cost} RUs", readOperation.Cost);
+                        var readOperation = await _repo.ReadAirportArrivals(airport.Code);
+                        LogOutput(
+                            $"'Arrivals board point read by pk/id {airport.Code}' - Cost: {readOperation.Cost} RUs",
+                            readOperation.Cost);
                         dict.Add(airport.Code, readOperation.AirportArrivals);
                     }
                     catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
                     {
                     }
-                }
                 else
-                {
                     dict.Add(airport.Code, null);
-                }
             }
+
             return dict;
         }
 
@@ -529,72 +521,71 @@ namespace FlightTelemetry.Desktop
 
         private void EnableDisableUI(bool enabled)
         {
-            this.LocationMapTopPanel.Enabled = enabled;
-            this.LocationMapTreeView.Enabled = enabled;
-            this.LocationMapTimer.Enabled = enabled;
+            LocationMapTopPanel.Enabled = enabled;
+            LocationMapTreeView.Enabled = enabled;
+            LocationMapTimer.Enabled = enabled;
 
-            this.ArrivalsBoardTreeView.Enabled = enabled;
-            this.ArrivalsBoardTimer.Enabled = enabled;
+            ArrivalsBoardTreeView.Enabled = enabled;
+            ArrivalsBoardTimer.Enabled = enabled;
         }
 
         private void CheckUncheckChildNodes(TreeNode checkedNode)
         {
-            this.ClearLog();
+            ClearLog();
             if (checkedNode.Parent == null)
             {
-                this._suppressEvent = true;
-                foreach (TreeNode node in checkedNode.Nodes)
-                {
-                    node.Checked = checkedNode.Checked;
-                }
-                this._suppressEvent = false;
+                _suppressEvent = true;
+                foreach (TreeNode node in checkedNode.Nodes) node.Checked = checkedNode.Checked;
+                _suppressEvent = false;
             }
         }
 
         private void LogOutput(string output, double ruCharge = 0)
         {
             System.Diagnostics.Debug.WriteLine(output);
-            lock (this._textToLogLock)
+            lock (_textToLogLock)
             {
-                this._loggedRuCharges += ruCharge;
-                this._textToLog += DateTime.Now.ToString() + " " + output + Environment.NewLine;
+                _loggedRuCharges += ruCharge;
+                _textToLog += DateTime.Now.ToString() + " " + output + Environment.NewLine;
             }
         }
 
         private void LogTimer_Tick(object sender, EventArgs e)
         {
-            lock (this._textToLogLock)
+            lock (_textToLogLock)
             {
-                if (this._textToLog.Length > 0)
+                if (_textToLog.Length > 0)
                 {
-                    this.LogTextBox.AppendText(this._textToLog);
-                    this._textToLog = string.Empty;
+                    LogTextBox.AppendText(_textToLog);
+                    _textToLog = string.Empty;
                 }
             }
-            this.TotalRUsToolStripLabel.Text = $"{this._loggedRuCharges:0.##}";
-            var elapsed = DateTime.Now.Subtract(this._logStartedAt);
-            this.ElapsedToolStripLabel.Text = $"{elapsed.Hours}h {elapsed.Minutes}m {elapsed.Seconds}s";
 
-            var average = (int)(this._loggedRuCharges / elapsed.TotalSeconds);
-            this.RURateToolStripLabel.Text = $"{average} RU/sec";
+            TotalRUsToolStripLabel.Text = $"{_loggedRuCharges:0.##}";
+            var elapsed = DateTime.Now.Subtract(_logStartedAt);
+            ElapsedToolStripLabel.Text = $"{elapsed.Hours}h {elapsed.Minutes}m {elapsed.Seconds}s";
+
+            var average = (int)(_loggedRuCharges / elapsed.TotalSeconds);
+            RURateToolStripLabel.Text = $"{average} RU/sec";
         }
 
-        private void ClearLogToolStripButton_Click(object sender, EventArgs e) =>
-            this.ClearLog();
+        private void ClearLogToolStripButton_Click(object sender, EventArgs e)
+        {
+            ClearLog();
+        }
 
         private void ClearLog()
         {
             System.Windows.Forms.Application.DoEvents();
-            this.LogTimer.Enabled = false;
+            LogTimer.Enabled = false;
             System.Windows.Forms.Application.DoEvents();
-            this.LogTextBox.Clear();
+            LogTextBox.Clear();
             System.Windows.Forms.Application.DoEvents();
-            this._loggedRuCharges = 0;
-            this._logStartedAt = DateTime.Now;
-            this.LogTimer.Enabled = true;
+            _loggedRuCharges = 0;
+            _logStartedAt = DateTime.Now;
+            LogTimer.Enabled = true;
         }
 
         #endregion
-
     }
 }

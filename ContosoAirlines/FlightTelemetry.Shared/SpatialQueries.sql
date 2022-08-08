@@ -2,15 +2,18 @@
 -- https://dev.to/willvelida/working-with-the-azure-cosmos-db-change-feed-processor-in-c-4j3g
 
 
-DECLARE @UsaWkt varchar(max) =
+DECLARE
+@UsaWkt varchar(max) =
 (SELECT BulkColumn FROM OPENROWSET(BULK 'C:\Projects\Pluralsight\Cosmos DB Change Feed Course\Code\Module05-Notifications\FlightTelemetryGenerator\MapData\usa-wkt.txt', SINGLE_BLOB) AS x)
 SET @UsaWkt = SUBSTRING(@UsaWkt, 4, DATALENGTH(@UsaWkt) - 4)
 
-DECLARE @NycWkt varchar(max) =
+DECLARE
+@NycWkt varchar(max) =
 (SELECT BulkColumn FROM OPENROWSET(BULK 'C:\Projects\Pluralsight\Cosmos DB Change Feed Course\Code\Module05-Notifications\FlightTelemetryGenerator\MapData\nyc-wkt.txt', SINGLE_BLOB) AS x)
 SET @NycWkt = SUBSTRING(@NycWkt, 4, DATALENGTH(@NycWkt) - 4)
 
-DECLARE @Airport geometry = 'GEOMETRYCOLLECTION(
+DECLARE
+@Airport geometry = 'GEOMETRYCOLLECTION(
 	POINT(-122.2961 47.4436),
 	POINT(-73.7781 40.6413),
 	POINT(-81.3081 28.4312),
@@ -19,29 +22,39 @@ DECLARE @Airport geometry = 'GEOMETRYCOLLECTION(
 	POINT(-104.6737 39.8561)
 )'
 
-DECLARE @Usa geometry = @UsaWkt
-DECLARE @Nyc geometry = @NycWkt
+DECLARE
+@Usa geometry = @UsaWkt
+DECLARE
+@Nyc geometry = @NycWkt
 
-SELECT @Usa UNION ALL SELECT @Nyc UNION ALL SELECT @Airport.STBuffer(1)
-
+SELECT @Usa
+UNION ALL
+SELECT @Nyc
+UNION ALL
+SELECT @Airport.STBuffer(1)
 
 
 -- Cosmos
-SELECT c.ts, COUNT(c.ts) FROM c GROUP BY c.timestamp
-SELECT c.isInNoFlyZone, COUNT(c.isInNoFlyZone) FROM c GROUP BY c.isInUsa
-SELECT * FROM c WHERE c.isInNoFlyZone = true
-SELECT * FROM c
+SELECT c.ts, COUNT(c.ts)
+FROM c
+GROUP BY c.timestamp
+SELECT c.isInNoFlyZone, COUNT(c.isInNoFlyZone)
+FROM c
+GROUP BY c.isInUsa
+SELECT *
+FROM c
+WHERE c.isInNoFlyZone = true
+SELECT *
+FROM c
 
-SELECT * FROM c
+SELECT *
+FROM c
 
-SELECT
- c.flightNumber,
- c.arrivalAirport,
- c.departureAirport,
- c.remainingMinutes
-FROM
- c
-
+SELECT c.flightNumber,
+       c.arrivalAirport,
+       c.departureAirport,
+       c.remainingMinutes
+FROM c
 
 
 /*
